@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hideout 🔒 — Anonymous Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+</head>
+<body>
+
+<!-- ═══ AGE GATE ═══ -->
+<div id="age-gate">
+  <div class="gate-card">
+    <div class="gate-logo">🔒</div>
+    <h1>Hideout</h1>
+    <p class="gate-sub">Anonymous · Unfiltered · Private</p>
+    <p class="gate-warn">18+ only. Solve the puzzle to enter.</p>
+    <div class="captcha-card">
+      <div class="captcha-label">Solve to enter</div>
+      <div id="captcha-q" class="captcha-eq">…</div>
+      <input id="captcha-ans" type="number" placeholder="= ?" autocomplete="off"/>
+      <div id="captcha-err" class="captcha-err"></div>
+    </div>
+    <button id="enter-btn" class="btn-primary full">Verify &amp; Enter →</button>
+    <p class="gate-note">By entering you confirm you are 18+ and agree to chat responsibly.</p>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app" class="hidden">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sb-top">
+      <div class="brand">🔒 <span>Hideout</span></div>
+      <div class="online-pill">● <span id="online-count">0</span> online</div>
+    </div>
+
+    <div class="user-card">
+      <span class="uc-avatar" id="my-avatar">🦊</span>
+      <div class="uc-info">
+        <span class="uc-name" id="my-nick">…</span>
+        <span class="uc-label">Anonymous</span>
+      </div>
+    </div>
+
+    <div class="section-label">CHAT MODE</div>
+    <nav class="mode-nav">
+      <button class="mode-btn" data-mode="random">
+        <span class="mb-icon">🌐</span><span class="mb-text">Global Chat</span>
+      </button>
+      <button class="mode-btn" data-mode="room">
+        <span class="mb-icon">🏠</span><span class="mb-text">Named Room</span>
+      </button>
+      <button class="mode-btn" data-mode="interest">
+        <span class="mb-icon">🎯</span><span class="mb-text">By Interest</span>
+      </button>
+      <button class="mode-btn" data-mode="coded">
+        <span class="mb-icon">🔐</span><span class="mb-text">Private Room</span>
+      </button>
+      <button class="mode-btn" data-mode="1v1">
+        <span class="mb-icon">💬</span><span class="mb-text">1-on-1</span>
+      </button>
+    </nav>
+
+    <!-- Named room param -->
+    <div id="room-param" class="param-box hidden">
+      <input id="room-input" type="text" placeholder="Room name…" maxlength="30"/>
+      <button id="room-join-btn" class="btn-accent small">Join</button>
+    </div>
+
+    <!-- Interest param -->
+    <div id="interest-param" class="param-box hidden">
+      <div class="interest-grid" id="interest-grid">
+        {% for tag in interests %}
+        <button class="tag-btn" data-tag="{{ tag }}">{{ tag }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Private room (create or join) -->
+    <div id="coded-param" class="param-box coded-panel hidden">
+      <button id="create-room-btn" class="btn-accent full small">🔐 Create New Room</button>
+      <div class="divider-or"><span>or join with code</span></div>
+      <div class="code-join-row">
+        <input id="code-input" type="text" placeholder="5-digit code" maxlength="5" pattern="[0-9]*" inputmode="numeric"/>
+        <button id="code-join-btn" class="btn-accent small">Join</button>
+      </div>
+      <div id="code-error" class="code-err"></div>
+    </div>
+
+    <!-- Room info bar -->
+    <div id="room-info-box" class="room-info-box hidden">
+      <div class="rib-left">
+        <div class="rib-name" id="rib-name">—</div>
+        <div class="rib-count"><span id="rib-count">0</span> users</div>
+      </div>
+      <!-- Room code badge (shown only for coded rooms) -->
+      <div id="room-code-badge" class="code-badge hidden">
+        <span class="code-badge-label">CODE</span>
+        <span id="room-code-display" class="code-badge-val">—</span>
+        <button id="copy-code-btn" class="copy-btn" title="Copy code">⎘</button>
+      </div>
+    </div>
+
+    <div class="sb-footer">Hideout v3.0 · 100% Anonymous</div>
+  </aside>
+
+  <!-- Chat main -->
+  <main id="chat-main">
+    <div id="topbar">
+      <button id="sidebar-toggle" class="icon-btn">☰</button>
+      <div id="tb-title">Choose a mode to start</div>
+      <div id="tb-status" class="tb-status hidden">● Connected</div>
+    </div>
+
+    <!-- WELCOME -->
+    <div id="view-welcome" class="view active">
+      <div class="welcome-body">
+        <div class="welcome-icon">🔒</div>
+        <h2>Welcome to Hideout</h2>
+        <p>Choose a chat mode from the sidebar.<br>No account. No logs. Completely anonymous.</p>
+        <div class="feature-grid">
+          <div class="feat"><span class="feat-icon">🌐</span><span>Global Chat</span></div>
+          <div class="feat"><span class="feat-icon">🏠</span><span>Private Rooms</span></div>
+          <div class="feat"><span class="feat-icon">🔐</span><span>Code Rooms</span></div>
+          <div class="feat"><span class="feat-icon">💬</span><span>1-on-1 Match</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div id="view-chat" class="view hidden">
+      <div id="messages" class="messages-box" role="log" aria-live="polite"></div>
+      <div id="typing-bar" class="typing-bar hidden"></div>
+      <form id="chat-form" class="chat-form">
+        <button type="button" class="icon-btn emoji-toggle" data-target="msg-input">😊</button>
+        <input id="msg-input" type="text" placeholder="Type a message…" maxlength="500" autocomplete="off"/>
+        <button type="submit" class="btn-send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+    </div>
+
+    <!-- QUEUE -->
+    <div id="view-queue" class="view hidden">
+      <div class="queue-body">
+        <div class="q-ring"></div>
+        <h3>Finding your match…</h3>
+        <p id="q-status">Searching for a partner</p>
+        <div class="q-meta">
+          <span>Position <strong id="q-pos">—</strong></span>
+          <span id="q-total"></span>
+        </div>
+        <button id="leave-queue-btn" class="btn-ghost small">✕ Leave Queue</button>
+      </div>
+    </div>
+
+    <!-- 1v1 CHAT -->
+    <div id="view-1v1" class="view hidden">
+      <div id="messages-1v1" class="messages-box" role="log" aria-live="polite"></div>
+      <div id="typing-bar-1v1" class="typing-bar hidden"></div>
+      <div class="pair-toolbar">
+        <button id="skip-btn" class="btn-ghost small">⏭ Next Partner</button>
+        <button id="leave-pair-btn" class="btn-danger-ghost small">✕ Leave</button>
+      </div>
+      <form id="chat-form-1v1" class="chat-form">
+        <button type="button" class="icon-btn emoji-toggle" data-target="msg-input-1v1">😊</button>
+        <input id="msg-input-1v1" type="text" placeholder="Say something…" maxlength="500" autocomplete="off"/>
+        <button type="submit" class="btn-send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+    </div>
+
+  </main>
+</div>
+
+<!-- Emoji picker (shared, moved by JS) -->
+<div id="emoji-picker" class="emoji-picker hidden">
+  <span>😊</span><span>😂</span><span>🔥</span><span>❤️</span><span>👍</span>
+  <span>😢</span><span>😎</span><span>🤔</span><span>👀</span><span>💯</span>
+  <span>🎉</span><span>😈</span><span>🙏</span><span>💀</span><span>😴</span>
+  <span>🤣</span><span>😤</span><span>🥺</span><span>😍</span><span>🤯</span>
+  <span>🫡</span><span>🤝</span><span>💪</span><span>🫠</span><span>🥳</span>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
