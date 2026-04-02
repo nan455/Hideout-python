@@ -14,7 +14,26 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-me-in-production')
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent',
+# Auto-detect best async mode: gevent (production) → eventlet → threading (local fallback)
+def _detect_async_mode():
+    try:
+        import gevent  # noqa
+        log.info("✅ Using async_mode: gevent")
+        return 'gevent'
+    except ImportError:
+        pass
+    try:
+        import eventlet  # noqa
+        log.info("✅ Using async_mode: eventlet")
+        return 'eventlet'
+    except ImportError:
+        pass
+    log.info("✅ Using async_mode: threading (local dev)")
+    return 'threading'
+
+ASYNC_MODE = _detect_async_mode()
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=ASYNC_MODE,
     ping_timeout=60, ping_interval=25, max_http_buffer_size=1_000_000,
     logger=False, engineio_logger=False)
 
