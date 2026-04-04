@@ -1,9 +1,5 @@
-import os
-import time
-import random
-import string
-import logging
-from flask import Flask, render_template, request, jsonify
+import os, time, random, string, logging, hashlib, re
+from flask import Flask, render_template, request, jsonify, make_response
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -15,36 +11,34 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
 
-# ── Auto-detect async mode ────────────────────────────────────────────────────
 def _get_async_mode():
     try:
-        import gevent; log.info("async_mode=gevent"); return 'gevent'
+        import gevent; return 'gevent'
     except ImportError: pass
     try:
-        import eventlet; log.info("async_mode=eventlet"); return 'eventlet'
+        import eventlet; return 'eventlet'
     except ImportError: pass
-    log.info("async_mode=threading"); return 'threading'
+    return 'threading'
 
 ASYNC_MODE = _get_async_mode()
+log.info(f"async_mode={ASYNC_MODE}")
 
-# ── Socket.IO ─────────────────────────────────────────────────────────────────
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode=ASYNC_MODE,
-    ping_timeout=60,
-    ping_interval=25,
-    max_http_buffer_size=1_000_000,
-    logger=False,
-    engineio_logger=False,
-    allow_upgrades=True,
-    cookie=None,
-)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=ASYNC_MODE,
+    ping_timeout=60, ping_interval=25, max_http_buffer_size=1_000_000,
+    logger=False, engineio_logger=False, allow_upgrades=True, cookie=None)
 
-limiter = Limiter(
-    key_func=get_remote_address, app=app,
-    default_limits=["300 per 15 minutes"], storage_uri="memory://"
-)
+limiter = Limiter(key_func=get_remote_address, app=app,
+    default_limits=["300 per 15 minutes"], storage_uri="memory://")
+
+# ── Security headers ──────────────────────────────────────────────────────────
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return response
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MAX_CONNECTIONS        = 2000
@@ -54,21 +48,27 @@ RATE_WINDOW            = 60
 MAX_MSG_LEN            = 500
 CAPTCHA_TTL            = 300
 CLEANUP_INTERVAL       = 120
+TERMS_VERSION          = "v1.0"   # bump this to force re-acceptance
 
 ADJECTIVES = ["Silent","Wild","Happy","Crazy","Mysterious","Swift","Noble","Brave",
     "Clever","Gentle","Fierce","Wise","Bold","Quick","Calm","Bright","Cool","Smart",
     "Lucky","Strong","Free","Kind","Pure","True","Dark","Cyber","Neon","Cosmic",
-    "Lunar","Solar","Arctic","Storm","Shadow"]
+    "Lunar","Solar","Arctic","Storm","Shadow","Rusty","Velvet","Frozen","Savage","Mystic"]
 ANIMALS = ["Fox","Wolf","Eagle","Panda","Tiger","Lion","Bear","Hawk","Owl","Deer",
     "Lynx","Raven","Snake","Shark","Whale","Dolphin","Phoenix","Dragon","Griffin",
     "Falcon","Jaguar","Panther","Cobra","Viper","Mantis","Badger","Coyote","Osprey",
-    "Mamba","Gecko","Orca","Sparrow"]
+    "Mamba","Gecko","Orca","Sparrow","Kraken","Yeti","Bison","Lynx","Stallion"]
 AVATARS = ["🦊","🐺","🦅","🐼","🐯","🦁","🐻","🦆","🦉","🦌","🐱","🐦","🐍",
     "🦈","🐋","🐬","🔥","🐉","⚡","🌙","💫","🌟","🎭","🎪","👾","🤖","👻",
-    "💀","🎯","🌈","🦋","🐙"]
+    "💀","🎯","🌈","🦋","🐙","🦂","🐲","🌊","❄️","🍄","🦁","🦎","🐊"]
 INTERESTS = ["gaming","music","movies","sports","tech","anime","travel","art",
-    "books","food","fitness","crypto","science","fashion"]
-BAD_WORDS = {'spam','hack','phish','scam'}
+    "books","food","fitness","crypto","science","fashion","photography","cooking",
+    "memes","politics","history","nature"]
+
+# Words that are completely blocked
+BLOCKED_WORDS = {'spam','phish','scam'}
+# Words that trigger a warning but are allowed
+WARN_WORDS = {'hack','admin','moderator'}
 
 # ── State ─────────────────────────────────────────────────────────────────────
 connection_limiter = {}
@@ -84,7 +84,6 @@ active_pairs       = {}
 pair_counter       = [0]
 socket_meta        = {}
 last_cleanup       = [time.time()]
-
 perf = {'start_time':time.time(),'total_connections':0,'total_messages':0,'peak_connections':0}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -98,10 +97,19 @@ def make_captcha():
     elif op=='-': a,b=max(n1,n2),min(n1,n2); return f"{a} - {b}", a-b
     else: s1,s2=random.randint(1,10),random.randint(1,10); return f"{s1} × {s2}", s1*s2
 
+def sanitize_message(msg):
+    """Remove HTML tags and normalise whitespace."""
+    if not msg or not isinstance(msg, str): return None
+    msg = re.sub(r'<[^>]+>', '', msg)        # strip HTML tags
+    msg = re.sub(r'\s+', ' ', msg).strip()   # collapse whitespace
+    return msg if msg else None
+
 def valid_msg(msg):
-    if not msg or not isinstance(msg,str): return False
-    if len(msg)>MAX_MSG_LEN or not msg.strip(): return False
-    return not any(w in msg.lower() for w in BAD_WORDS)
+    if not msg: return False, 'empty'
+    if len(msg) > MAX_MSG_LEN: return False, 'too_long'
+    low = msg.lower()
+    if any(w in low for w in BLOCKED_WORDS): return False, 'blocked'
+    return True, 'ok'
 
 def check_rate(sid):
     now = time.time()
@@ -121,19 +129,16 @@ def gen_code():
         c=str(random.randint(10000,99999))
         if c not in room_codes: return c
 
+def get_ip():
+    fwd = request.environ.get('HTTP_X_FORWARDED_FOR','')
+    return fwd.split(',')[0].strip() if fwd else (request.remote_addr or '0.0.0.0')
+
 def cleanup():
     now=time.time()
     if now-last_cleanup[0]<CLEANUP_INTERVAL: return
     last_cleanup[0]=now
     for k in [k for k,v in captcha_store.items() if now>v['expires']]: captcha_store.pop(k,None)
     for k in [k for k,v in message_rates.items() if now>v['reset_time']+RATE_WINDOW*2]: message_rates.pop(k,None)
-
-def get_client_ip():
-    """Get real IP behind Render's proxy."""
-    forwarded = request.environ.get('HTTP_X_FORWARDED_FOR','')
-    if forwarded:
-        return forwarded.split(',')[0].strip()
-    return request.remote_addr or '0.0.0.0'
 
 # ── Room management ───────────────────────────────────────────────────────────
 def add_to_room(sid, room_key):
@@ -177,7 +182,6 @@ def run_match():
         socketio.emit('matched',{'partnerName':u2['nickname'],'partnerAvatar':u2['avatar'],'roomId':rid},to=u1['sid'])
         socketio.emit('matched',{'partnerName':u1['nickname'],'partnerAvatar':u1['avatar'],'roomId':rid},to=u2['sid'])
         sys_msg(rid,"You've been matched! 👋 Say hello.")
-        log.info(f"💑 {u1['nickname']} ↔ {u2['nickname']}")
     push_q()
 
 def enqueue(sid):
@@ -205,14 +209,14 @@ def end_pair(sid,skipped=False):
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 @app.route('/')
-def index(): return render_template('index.html',interests=INTERESTS)
+def index(): return render_template('index.html',interests=INTERESTS,terms_version=TERMS_VERSION)
 
 @app.route('/generate-captcha')
 @limiter.limit("30 per minute")
 def gen_captcha():
     cleanup()
     q,a=make_captcha()
-    cid=''.join(random.choices(string.ascii_lowercase+string.digits,k=10))
+    cid=''.join(random.choices(string.ascii_lowercase+string.digits,k=12))
     captcha_store[cid]={'answer':a,'expires':time.time()+CAPTCHA_TTL}
     return jsonify({'id':cid,'question':q})
 
@@ -220,15 +224,18 @@ def gen_captcha():
 @limiter.limit("20 per minute")
 def verify_captcha():
     data=request.get_json(silent=True) or {}
+    # Also require terms acceptance
+    if not data.get('termsAccepted'):
+        return jsonify({'success':False,'message':'You must accept the Terms & Conditions.'})
     entry=captcha_store.get(data.get('captchaId',''))
     if not entry or time.time()>entry['expires']:
-        return jsonify({'success':False,'message':'Captcha expired.'})
+        return jsonify({'success':False,'message':'Captcha expired. Refresh.'})
     try:
         if int(data.get('answer','x'))==entry['answer']:
             captcha_store.pop(data.get('captchaId'),None)
             return jsonify({'success':True})
     except: pass
-    return jsonify({'success':False,'message':'Wrong answer.'})
+    return jsonify({'success':False,'message':'Wrong answer. Try again.'})
 
 @app.route('/health')
 def health():
@@ -239,19 +246,20 @@ def health():
 # ── Socket events ─────────────────────────────────────────────────────────────
 @socketio.on('connect')
 def on_connect():
-    sid=request.sid; ip=get_client_ip()
+    sid=request.sid; ip=get_ip()
     if len(socket_meta)>=MAX_CONNECTIONS:
         emit('error',{'msg':'Server full.'}); return False
     cnt=connection_limiter.get(ip,0)
     if cnt>=MAX_CONNECTIONS_PER_IP:
-        emit('error',{'msg':'Too many connections.'}); return False
+        emit('error',{'msg':'Too many connections from your network.'}); return False
     connection_limiter[ip]=cnt+1
     nick=rnd_name(); avatar=rnd_avatar()
-    socket_meta[sid]={'nickname':nick,'avatar':avatar,'room':None,'ip':ip,'joined_at':time.time(),'msg_count':0}
+    socket_meta[sid]={'nickname':nick,'avatar':avatar,'room':None,'ip':ip,
+        'joined_at':time.time(),'msg_count':0,'reactions':0}
     perf['total_connections']+=1; perf['peak_connections']=max(perf['peak_connections'],len(socket_meta))
     emit('welcome',{'nickname':nick,'avatar':avatar,'interests':INTERESTS,'online':len(socket_meta)})
     socketio.emit('onlineCount',{'count':len(socket_meta)})
-    log.info(f"🔗 {nick} | ip={ip} | total={len(socket_meta)}")
+    log.info(f"🔗 {nick} | total={len(socket_meta)}")
 
 @socketio.on('disconnect')
 def on_disconnect():
@@ -273,17 +281,19 @@ def on_join_mode(data):
     if not meta: return
     if isinstance(data,dict): mode=data.get('mode','random'); param=(data.get('param') or '').strip()[:30]
     else: mode=str(data); param=''
+    # Sanitize param
+    param = re.sub(r'[^a-zA-Z0-9_\-]','',param)
     dequeue(sid)
     if sid in active_pairs: end_pair(sid)
-    if   mode=='random':             room_key='global_random'
-    elif mode=='room'    and param:  room_key=f"room_{param.lower().replace(' ','_')}"
-    elif mode=='interest' and param: room_key=f"interest_{param.lower()}"
-    else:                            room_key='global_random'
+    if   mode=='random':              room_key='global_random'
+    elif mode=='room'    and param:   room_key=f"room_{param.lower()}"
+    elif mode=='interest' and param:  room_key=f"interest_{param.lower()}"
+    else:                             room_key='global_random'
     add_to_room(sid,room_key)
     sys_msg(room_key,f"{meta['nickname']} joined 👋")
     code=next((c for c,rk in room_codes.items() if rk==room_key),None)
-    emit('joinedRoom',{'room':room_key,'userCount':len(rooms.get(room_key,set())),'code':code,'isOwner':code_owners.get(room_key)==sid})
-    log.info(f"📥 {meta['nickname']} → {room_key}")
+    emit('joinedRoom',{'room':room_key,'userCount':len(rooms.get(room_key,set())),
+        'code':code,'isOwner':code_owners.get(room_key)==sid})
 
 @socketio.on('createCodedRoom')
 def on_create_coded():
@@ -296,14 +306,13 @@ def on_create_coded():
     add_to_room(sid,room_key)
     sys_msg(room_key,f"🔐 Private room created! Share code: {code}")
     emit('joinedRoom',{'room':room_key,'userCount':1,'code':code,'isOwner':True})
-    log.info(f"🔐 {meta['nickname']} created {code}")
 
 @socketio.on('joinByCode')
 def on_join_by_code(data):
     sid=request.sid; meta=socket_meta.get(sid)
     if not meta: return
     code=str(data.get('code','')).strip()
-    if not code.isdigit() or len(code)!=5:
+    if not re.match(r'^\d{5}$',code):
         emit('codeError',{'message':'Must be 5 digits.'}); return
     room_key=room_codes.get(code)
     if not room_key:
@@ -313,7 +322,6 @@ def on_join_by_code(data):
     add_to_room(sid,room_key)
     sys_msg(room_key,f"{meta['nickname']} joined 🔑")
     emit('joinedRoom',{'room':room_key,'userCount':len(rooms.get(room_key,set())),'code':code,'isOwner':False})
-    log.info(f"🔑 {meta['nickname']} joined {code}")
 
 @socketio.on('join1v1')
 def on_join_1v1():
@@ -338,16 +346,42 @@ def on_leave_1v1():
 def on_message(data):
     sid=request.sid; meta=socket_meta.get(sid)
     if not meta: return
-    msg=(data if isinstance(data,str) else data.get('msg','')).strip()
-    if not check_rate(sid): emit('notice',{'type':'warn','msg':'⚠️ Too many messages.'}); return
-    if not valid_msg(msg): emit('notice',{'type':'error','msg':'Message blocked.'}); return
+    raw=(data if isinstance(data,str) else data.get('msg','')).strip()
+    msg = sanitize_message(raw)
+    if not check_rate(sid):
+        emit('notice',{'type':'warn','msg':'⚠️ Slow down! Too many messages.'}); return
+    ok, reason = valid_msg(msg)
+    if not ok:
+        if reason=='too_long': emit('notice',{'type':'warn','msg':f'Message too long (max {MAX_MSG_LEN} chars).'})
+        else: emit('notice',{'type':'error','msg':'Message not allowed.'})
+        return
     room=meta.get('room')
     if not room: emit('notice',{'type':'error','msg':'Join a room first!'}); return
     meta['msg_count']+=1
     if room in room_stats: room_stats[room]['total_messages']+=1; room_stats[room]['last_activity']=time.time()
     perf['total_messages']+=1
-    socketio.emit('chat message',{'nickname':meta['nickname'],'avatar':meta['avatar'],
-        'msg':msg[:MAX_MSG_LEN],'timestamp':ts(),'type':'user'},to=room)
+    # NEVER echo sender's session ID, IP, or any identifiable data
+    socketio.emit('chat message',{
+        'nickname':meta['nickname'],
+        'avatar'  :meta['avatar'],
+        'msg'     :msg[:MAX_MSG_LEN],
+        'timestamp':ts(),
+        'type'    :'user',
+        'msgId'   :''.join(random.choices(string.ascii_lowercase+string.digits,k=8)),
+    }, to=room)
+
+@socketio.on('reaction')
+def on_reaction(data):
+    """Send an emoji reaction to the room."""
+    sid=request.sid; meta=socket_meta.get(sid)
+    if not meta: return
+    room=meta.get('room')
+    if not room: return
+    emoji=str(data.get('emoji',''))
+    ALLOWED_REACTIONS=['👍','❤️','😂','😮','😢','🔥','👏','💯']
+    if emoji not in ALLOWED_REACTIONS: return
+    meta['reactions']+=1
+    socketio.emit('reaction',{'emoji':emoji,'from':meta['nickname']},to=room)
 
 @socketio.on('typing')
 def on_typing():
@@ -365,8 +399,7 @@ def on_get_online(): emit('onlineCount',{'count':len(socket_meta)})
 @socketio.on('ping')
 def on_ping(): emit('pong',{'ts':ts()})
 
-# ── Entry ─────────────────────────────────────────────────────────────────────
 if __name__=='__main__':
     port=int(os.environ.get('PORT',8080))
-    log.info(f"🚀 Hideout running → http://0.0.0.0:{port}  [mode={ASYNC_MODE}]")
+    log.info(f"🚀 Hideout running → http://0.0.0.0:{port}  [{ASYNC_MODE}]")
     socketio.run(app,host='0.0.0.0',port=port,debug=False,allow_unsafe_werkzeug=True)
