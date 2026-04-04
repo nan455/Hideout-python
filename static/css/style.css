@@ -6,7 +6,7 @@
   --accent-g:linear-gradient(135deg,#7c3aed,#a855f7);
   --green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;
   --text:#e4e4f0;--text2:#8888aa;--text3:#44445a;
-  --radius:14px;--radius-sm:8px;--sidebar-w:242px;--topbar-h:52px;
+  --radius:14px;--radius-sm:8px;--sidebar-w:300px;--topbar-h:52px;
   --shadow:0 8px 40px rgba(0,0,0,.6);--tr:.17s cubic-bezier(.4,0,.2,1);
   --font:'Inter',system-ui,sans-serif;
 }
@@ -59,7 +59,7 @@ button{font-family:inherit;cursor:pointer}input,textarea{font-family:inherit}
 /* ── Buttons ── */
 .btn-primary{background:var(--accent-g);color:#fff;border:none;border-radius:var(--radius-sm);padding:.75rem 1.5rem;font-size:.95rem;font-weight:600;transition:opacity var(--tr),transform var(--tr)}
 .btn-primary:hover:not(:disabled){opacity:.9}.btn-primary:active{transform:scale(.97)}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed}.btn-primary.full{width:100%}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
 .btn-accent{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:.5rem 1rem;font-size:.85rem;font-weight:600;transition:background var(--tr);white-space:nowrap}
 .btn-accent:hover{background:var(--accent-h)}.btn-accent.small{padding:.38rem .8rem;font-size:.8rem}.btn-accent.full{width:100%}
 .btn-ghost{background:var(--bg4);color:var(--text2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:.5rem 1rem;font-size:.85rem;font-weight:500;transition:all var(--tr)}
