@@ -2,193 +2,317 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="description" content="Hideout — Anonymous real-time chat. No sign-up needed."/>
-  <meta name="robots" content="noindex, nofollow"/>
-  <title>Hideout 🔒 — Anonymous Chat</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="robots" content="noindex,nofollow"/>
+  <title>Hideout 📻 — Anonymous Chat</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/style.css"/>
   <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 </head>
 <body>
 
-<!-- ═══ TERMS MODAL ═══ -->
-<div id="terms-modal" class="overlay">
-  <div class="terms-card">
-    <div class="terms-header">
-      <span class="terms-logo">🔒</span>
-      <h1>Hideout</h1>
-      <p class="terms-tagline">Anonymous · Private · Unfiltered</p>
-    </div>
-    <div class="terms-body">
-      <h3>Terms &amp; Conditions</h3>
-      <div class="terms-scroll">
-        <p><strong>1. Age Requirement</strong><br>You must be 18 years or older to use this platform. By entering, you confirm you meet this age requirement.</p>
-        <p><strong>2. Anonymity &amp; Privacy</strong><br>Hideout is fully anonymous. We do not collect usernames, emails, phone numbers, or any personal data. Your messages are not stored on our servers. Sessions are temporary and deleted when you disconnect.</p>
-        <p><strong>3. Acceptable Use</strong><br>You agree NOT to use Hideout to: share illegal content, harass or threaten others, distribute spam or malware, solicit money or personal information from users, or impersonate others.</p>
-        <p><strong>4. No Logs Policy</strong><br>We do not log chat messages, IP addresses, or user activity. Conversations are ephemeral — once you disconnect, they are gone forever.</p>
-        <p><strong>5. Content Responsibility</strong><br>You are solely responsible for anything you send. Hideout takes no responsibility for user-generated content.</p>
-        <p><strong>6. No Warranty</strong><br>This service is provided "as is" without warranty of any kind. We reserve the right to terminate service at any time.</p>
-        <p><strong>7. Prohibited Content</strong><br>Any content involving minors in a sexual context is strictly prohibited and may be reported to law enforcement. Zero tolerance policy.</p>
+<!-- pixel stars bg -->
+<div class="stars-bg" id="stars-bg"></div>
+
+<!-- ═══ TERMS ═══ -->
+<div id="terms-modal" class="gate-screen">
+  <div class="retro-card terms-card">
+    <div class="card-title-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title-text">📻 HIDEOUT — Welcome!</span></div>
+    <div class="card-body">
+      <div class="pixelart-logo">📻</div>
+      <h1 class="retro-h1">Hideout</h1>
+      <p class="retro-sub">your anonymous corner of the internet</p>
+      <div class="terms-list">
+        <div class="term-row"><span class="term-ico">🔞</span><span>You must be <strong>18+</strong> to enter this space.</span></div>
+        <div class="term-row"><span class="term-ico">🕵️</span><span>We store <strong>zero data</strong> — no messages, no IPs, no logs ever.</span></div>
+        <div class="term-row"><span class="term-ico">🤝</span><span>Be respectful. No harassment, spam, or illegal content.</span></div>
+        <div class="term-row"><span class="term-ico">💨</span><span>Everything vanishes when you disconnect. Truly ephemeral.</span></div>
+        <div class="term-row"><span class="term-ico">🚫</span><span>Zero tolerance for content involving minors.</span></div>
       </div>
-      <label class="terms-check">
-        <input type="checkbox" id="terms-cb"/>
-        <span class="cb-box"></span>
-        <span>I am 18+, I have read and agree to the <strong>Terms &amp; Conditions</strong></span>
+      <label class="check-label">
+        <span class="check-box"><input type="checkbox" id="terms-cb"/><span class="check-inner">✓</span></span>
+        <span>I'm 18+, I've read and accept the terms</span>
       </label>
+      <button id="terms-accept-btn" class="retro-btn primary big" disabled>Let me in! →</button>
     </div>
-    <button id="terms-accept-btn" class="btn-primary full" disabled>Accept &amp; Continue →</button>
   </div>
 </div>
 
-<!-- ═══ AGE GATE / CAPTCHA ═══ -->
-<div id="age-gate" class="overlay hidden">
-  <div class="gate-card">
-    <div class="gate-logo">🔒</div>
-    <h2>Verify you're human</h2>
-    <p class="gate-sub">Solve the puzzle to enter</p>
-    <div class="captcha-card">
-      <div class="captcha-label">Quick maths</div>
-      <div id="captcha-q" class="captcha-eq">…</div>
-      <input id="captcha-ans" type="number" placeholder="= ?" autocomplete="off"/>
-      <div id="captcha-err" class="captcha-err"></div>
+<!-- ═══ CAPTCHA ═══ -->
+<div id="age-gate" class="gate-screen hidden">
+  <div class="retro-card captcha-card">
+    <div class="card-title-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title-text">🤖 Robot Check</span></div>
+    <div class="card-body center">
+      <p class="captcha-prompt">Quick maths to prove you're human:</p>
+      <div id="captcha-q" class="captcha-bubble">…</div>
+      <input id="captcha-ans" class="retro-input big-input" type="number" placeholder="your answer"/>
+      <div id="captcha-err" class="err-msg"></div>
+      <button id="enter-btn" class="retro-btn primary big">Enter Hideout 🚀</button>
+      <p class="fine-print">🔒 100% anonymous · no accounts · no data stored</p>
     </div>
-    <button id="enter-btn" class="btn-primary full">Enter Hideout →</button>
-    <p class="gate-note">Your session is 100% anonymous. No data is stored.</p>
   </div>
 </div>
 
 <!-- ═══ APP ═══ -->
 <div id="app" class="hidden">
+
+  <!-- SIDEBAR -->
   <aside id="sidebar">
-    <div class="sb-top">
-      <div class="brand">🔒 <span>Hideout</span></div>
-      <div class="online-pill">● <span id="online-count">0</span> online</div>
+    <div class="sb-logo">
+      <span class="logo-emoji">📻</span>
+      <span class="logo-text">HIDEOUT</span>
+      <div class="live-badge"><span class="blink-dot"></span><span id="online-count">0</span></div>
     </div>
-    <div class="user-card">
-      <span class="uc-avatar" id="my-avatar">🦊</span>
-      <div class="uc-info">
-        <span class="uc-name" id="my-nick">…</span>
-        <span class="uc-badge">Anonymous</span>
+
+    <div class="user-bubble">
+      <span id="my-avatar" class="u-ava">🦊</span>
+      <div class="u-info">
+        <span id="my-nick" class="u-name">Loading…</span>
+        <span class="u-tag">anonymous</span>
       </div>
     </div>
-    <div class="section-label">CHAT MODE</div>
-    <nav class="mode-nav">
-      <button class="mode-btn" data-mode="random"><span class="mb-icon">🌐</span><span>Global Chat</span></button>
-      <button class="mode-btn" data-mode="room"><span class="mb-icon">🏠</span><span>Named Room</span></button>
-      <button class="mode-btn" data-mode="interest"><span class="mb-icon">🎯</span><span>By Interest</span></button>
-      <button class="mode-btn" data-mode="coded"><span class="mb-icon">🔐</span><span>Private Room</span></button>
-      <button class="mode-btn" data-mode="1v1"><span class="mb-icon">💬</span><span>1-on-1</span></button>
-    </nav>
-    <div id="room-param" class="param-box hidden">
-      <input id="room-input" type="text" placeholder="Room name…" maxlength="30"/>
-      <button id="room-join-btn" class="btn-accent small">Join</button>
+
+    <!-- Navigation tabs -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-panel="chat-panel">💬 Chat</button>
+      <button class="nav-tab" data-panel="interest-panel">🎯 Explore</button>
+      <button class="nav-tab" data-panel="confess-panel">🤫 Board</button>
     </div>
-    <div id="interest-param" class="param-box hidden">
-      <div class="interest-grid">
-        {% for tag in interests %}
-        <button class="tag-btn" data-tag="{{ tag }}">{{ tag }}</button>
+
+    <!-- Chat panel -->
+    <div id="chat-panel" class="sb-panel active">
+      <div class="mode-cards">
+        <button class="mode-card" data-mode="random">
+          <span class="mc-icon">🌍</span>
+          <span class="mc-name">Global</span>
+          <span class="mc-desc">Everyone online</span>
+        </button>
+        <button class="mode-card" data-mode="room">
+          <span class="mc-icon">🏠</span>
+          <span class="mc-name">Room</span>
+          <span class="mc-desc">Named space</span>
+        </button>
+        <button class="mode-card" data-mode="coded">
+          <span class="mc-icon">🔐</span>
+          <span class="mc-name">Private</span>
+          <span class="mc-desc">Secret code</span>
+        </button>
+        <button class="mode-card" data-mode="1v1">
+          <span class="mc-icon">🎲</span>
+          <span class="mc-name">Random 1v1</span>
+          <span class="mc-desc">Stranger chat</span>
+        </button>
+      </div>
+
+      <div id="room-sub" class="sub-box hidden">
+        <input id="room-input" class="retro-input" type="text" placeholder="room name…" maxlength="30"/>
+        <button id="room-join-btn" class="retro-btn small">Go!</button>
+      </div>
+
+      <div id="coded-sub" class="sub-box coded-box hidden">
+        <button id="create-room-btn" class="retro-btn small full">✨ Create Private Room</button>
+        <div class="or-line"><span>or join by code</span></div>
+        <div class="code-row">
+          <input id="code-input" class="retro-input code-in" type="text" placeholder="12345" maxlength="5" inputmode="numeric"/>
+          <button id="code-join-btn" class="retro-btn small">Join</button>
+        </div>
+        <span id="code-error" class="err-msg small"></span>
+      </div>
+
+      <!-- Room status -->
+      <div id="room-status" class="room-status hidden">
+        <span class="rs-name" id="rs-name">—</span>
+        <span class="rs-count"><span id="rs-count">0</span> chatting</span>
+        <div id="code-badge" class="code-badge hidden">
+          <span id="code-badge-val">—</span>
+          <button id="copy-code-btn" class="copy-btn">📋</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interest explore panel -->
+    <div id="interest-panel" class="sb-panel hidden">
+      <div class="explore-search">
+        <input id="interest-search" class="retro-input small" type="text" placeholder="🔍 search topics…"/>
+      </div>
+      <div id="interest-cats" class="interest-cats">
+        {% for cat, tags in interest_categories.items() %}
+        <div class="cat-group">
+          <div class="cat-header">{{ cat }}</div>
+          <div class="cat-tags">
+            {% for tag in tags %}
+            <button class="interest-tag" data-tag="{{ tag }}">{{ tag }}</button>
+            {% endfor %}
+          </div>
+        </div>
         {% endfor %}
       </div>
     </div>
-    <div id="coded-param" class="param-box coded-panel hidden">
-      <button id="create-room-btn" class="btn-accent full small">🔐 Create Private Room</button>
-      <div class="divider-or"><span>or join with code</span></div>
-      <div class="code-join-row">
-        <input id="code-input" type="text" placeholder="5-digit code" maxlength="5" inputmode="numeric"/>
-        <button id="code-join-btn" class="btn-accent small">Join</button>
+
+    <!-- Confession board panel -->
+    <div id="confess-panel" class="sb-panel hidden">
+      <div class="confess-compose">
+        <p class="confess-hint">Post anonymously 🤫</p>
+        <div class="mood-row">
+          <span class="mood-label">mood:</span>
+          <div class="mood-picker">
+            <button class="mood-btn selected" data-mood="😶">😶</button>
+            <button class="mood-btn" data-mood="😭">😭</button>
+            <button class="mood-btn" data-mood="😡">😡</button>
+            <button class="mood-btn" data-mood="🥺">🥺</button>
+            <button class="mood-btn" data-mood="😍">😍</button>
+            <button class="mood-btn" data-mood="😂">😂</button>
+            <button class="mood-btn" data-mood="🤯">🤯</button>
+            <button class="mood-btn" data-mood="🥳">🥳</button>
+          </div>
+        </div>
+        <textarea id="confess-input" class="retro-textarea" placeholder="your confession…" maxlength="300" rows="3"></textarea>
+        <button id="post-confess-btn" class="retro-btn small full">Post Anonymously 🤫</button>
       </div>
-      <div id="code-error" class="code-err"></div>
+      <div class="confess-feed" id="confess-feed">
+        <p class="feed-empty">Loading confessions…</p>
+      </div>
     </div>
-    <div id="room-info-box" class="room-info-box hidden">
-      <div class="rib-left">
-        <div class="rib-name" id="rib-name">—</div>
-        <div class="rib-count"><span id="rib-count">0</span> users</div>
-      </div>
-      <div id="room-code-badge" class="code-badge hidden">
-        <span class="code-lbl">CODE</span>
-        <span id="room-code-display" class="code-val">—</span>
-        <button id="copy-code-btn" class="copy-btn" title="Copy">⎘</button>
-      </div>
+
+    <div class="sb-footer">
+      <button id="sound-btn" class="tool-btn" title="Toggle sound">🔔</button>
+      <button id="theme-btn" class="tool-btn" title="Toggle theme">🎨</button>
+      <span class="version-tag">v4.0</span>
     </div>
-    <div class="sb-footer">Hideout · No logs · No data stored</div>
   </aside>
 
-  <main id="chat-main">
-    <div id="topbar">
-      <button id="sidebar-toggle" class="icon-btn">☰</button>
-      <div id="tb-title">Choose a mode to start</div>
-      <div id="tb-status" class="tb-status hidden"></div>
+  <!-- MAIN AREA -->
+  <main id="main">
+    <!-- Topbar -->
+    <header id="topbar">
+      <button id="menu-btn" class="tb-btn">☰</button>
+      <div class="tb-mid">
+        <span id="tb-room" class="tb-room">📻 Hideout</span>
+        <span id="tb-users" class="tb-users hidden"></span>
+      </div>
+      <div class="tb-right">
+        <button id="poll-btn" class="tb-btn" title="Create poll" style="display:none">📊</button>
+        <button id="search-btn" class="tb-btn" title="Search">🔍</button>
+      </div>
+    </header>
+
+    <!-- Search -->
+    <div id="search-bar" class="search-bar hidden">
+      <input id="search-input" class="retro-input" placeholder="search messages…"/>
+      <button id="search-close" class="retro-btn small">✕</button>
     </div>
 
-    <!-- WELCOME -->
+    <!-- Poll creation modal -->
+    <div id="poll-modal" class="modal-overlay hidden">
+      <div class="retro-card poll-card">
+        <div class="card-title-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title-text">📊 Create a Poll</span></div>
+        <div class="card-body">
+          <input id="poll-question" class="retro-input" placeholder="Ask a question…" maxlength="100"/>
+          <input id="poll-opt1" class="retro-input" placeholder="Option 1" maxlength="50"/>
+          <input id="poll-opt2" class="retro-input" placeholder="Option 2" maxlength="50"/>
+          <input id="poll-opt3" class="retro-input" placeholder="Option 3 (optional)" maxlength="50"/>
+          <input id="poll-opt4" class="retro-input" placeholder="Option 4 (optional)" maxlength="50"/>
+          <div class="modal-btns">
+            <button id="poll-cancel" class="retro-btn secondary">Cancel</button>
+            <button id="poll-submit" class="retro-btn primary">Launch Poll 🚀</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Views -->
     <div id="view-welcome" class="view active">
-      <div class="welcome-body">
-        <div class="welcome-icon">🔒</div>
-        <h2>Welcome to Hideout</h2>
-        <p>Choose a chat mode from the sidebar.<br>No account. No logs. Completely anonymous.</p>
-        <div class="feature-grid">
-          <div class="feat" onclick="document.querySelector('[data-mode=random]').click()"><span class="fi">🌐</span><span>Global Chat</span></div>
-          <div class="feat" onclick="document.querySelector('[data-mode=room]').click()"><span class="fi">🏠</span><span>Private Rooms</span></div>
-          <div class="feat" onclick="document.querySelector('[data-mode=coded]').click()"><span class="fi">🔐</span><span>Code Rooms</span></div>
-          <div class="feat" onclick="document.querySelector('[data-mode=1v1]').click()"><span class="fi">💬</span><span>1-on-1 Match</span></div>
+      <div class="welcome-stage">
+        <div class="welcome-mascot">📻</div>
+        <h2 class="welcome-h2">Welcome to Hideout!</h2>
+        <p class="welcome-p">Pick a vibe and start chatting.<br>No account. No traces. Just vibes.</p>
+        <div class="welcome-grid">
+          <div class="wg-card" onclick="clickMode('random')"><span>🌍</span><span>Global Chat</span></div>
+          <div class="wg-card" onclick="clickMode('room')"><span>🏠</span><span>Named Room</span></div>
+          <div class="wg-card" onclick="clickMode('coded')"><span>🔐</span><span>Private Room</span></div>
+          <div class="wg-card" onclick="clickMode('1v1')"><span>🎲</span><span>Random 1v1</span></div>
+          <div class="wg-card" onclick="switchPanel('interest-panel')"><span>🎯</span><span>By Interest</span></div>
+          <div class="wg-card" onclick="switchPanel('confess-panel')"><span>🤫</span><span>Confess Board</span></div>
+        </div>
+        <div class="welcome-ticker">
+          <span class="ticker-label">📡 live:</span>
+          <span id="ticker-count">0</span> anonymous people online right now
         </div>
       </div>
     </div>
 
-    <!-- CHAT -->
     <div id="view-chat" class="view hidden">
-      <div id="messages" class="messages-box" role="log" aria-live="polite"></div>
-      <div id="typing-bar" class="typing-bar hidden"></div>
-      <div id="reaction-bar" class="reaction-bar">
-        <button class="react-btn" data-emoji="👍">👍</button>
-        <button class="react-btn" data-emoji="❤️">❤️</button>
-        <button class="react-btn" data-emoji="😂">😂</button>
-        <button class="react-btn" data-emoji="😮">😮</button>
-        <button class="react-btn" data-emoji="🔥">🔥</button>
-        <button class="react-btn" data-emoji="👏">👏</button>
+      <!-- Active poll display -->
+      <div id="poll-display" class="poll-display hidden"></div>
+      <div id="messages" class="msg-list" role="log" aria-live="polite"></div>
+      <div id="typing-bar" class="typing-strip hidden"></div>
+      <!-- Reply preview -->
+      <div id="reply-preview" class="reply-preview hidden">
+        <span id="reply-text"></span>
+        <button id="cancel-reply" class="cancel-reply">✕</button>
       </div>
-      <form id="chat-form" class="chat-form">
-        <button type="button" class="icon-btn emoji-toggle" data-target="msg-input" title="Emoji">😊</button>
-        <input id="msg-input" type="text" placeholder="Type a message…" maxlength="500" autocomplete="off"/>
-        <span id="char-count" class="char-count">500</span>
-        <button type="submit" class="btn-send" title="Send">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </form>
-    </div>
-
-    <!-- QUEUE -->
-    <div id="view-queue" class="view hidden">
-      <div class="queue-body">
-        <div class="q-ring"></div>
-        <h3>Finding your match…</h3>
-        <p id="q-status">Searching</p>
-        <div class="q-meta"><span>Position <strong id="q-pos">—</strong></span><span id="q-total"></span></div>
-        <div class="q-tips">
-          <span>💡 Tips while you wait</span>
-          <p id="q-tip">Be respectful. Keep it fun.</p>
+      <!-- Reaction tray -->
+      <div class="react-tray">
+        <button class="react" data-emoji="👍">👍</button>
+        <button class="react" data-emoji="❤️">❤️</button>
+        <button class="react" data-emoji="😂">😂</button>
+        <button class="react" data-emoji="🔥">🔥</button>
+        <button class="react" data-emoji="😮">😮</button>
+        <button class="react" data-emoji="🎉">🎉</button>
+        <button class="react" data-emoji="💀">💀</button>
+        <button class="react" data-emoji="🤡">🤡</button>
+      </div>
+      <div class="input-dock">
+        <button class="dock-btn emoji-toggle" data-target="msg-input">😊</button>
+        <div class="input-wrap">
+          <input id="msg-input" type="text" placeholder="say something…" maxlength="500" autocomplete="off"/>
+          <span id="char-count" class="char-badge">500</span>
         </div>
-        <button id="leave-queue-btn" class="btn-ghost small">✕ Leave Queue</button>
+        <button class="dock-btn send-btn" id="send-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
       </div>
     </div>
 
-    <!-- 1v1 -->
-    <div id="view-1v1" class="view hidden">
-      <div id="messages-1v1" class="messages-box" role="log" aria-live="polite"></div>
-      <div id="typing-bar-1v1" class="typing-bar hidden"></div>
-      <div class="pair-toolbar">
-        <button id="skip-btn" class="btn-ghost small">⏭ Next Partner</button>
-        <button id="leave-pair-btn" class="btn-danger-ghost small">✕ Leave</button>
+    <div id="view-queue" class="view hidden">
+      <div class="queue-stage">
+        <div class="queue-animation">
+          <span class="q-emoji q-e1">🎲</span>
+          <span class="q-emoji q-e2">🔍</span>
+          <span class="q-emoji q-e3">👀</span>
+        </div>
+        <h3 class="queue-h3">Finding you a stranger…</h3>
+        <p id="q-status" class="queue-p">Searching the void…</p>
+        <div class="queue-pos">
+          Position <strong id="q-pos">?</strong>
+          <span id="q-total"></span>
+        </div>
+        <div class="tip-card">
+          <span class="tip-icon">💡</span>
+          <span id="q-tip">Break the ice with a fun question!</span>
+        </div>
+        <button id="leave-queue-btn" class="retro-btn secondary small">Leave Queue</button>
       </div>
-      <form id="chat-form-1v1" class="chat-form">
-        <button type="button" class="icon-btn emoji-toggle" data-target="msg-input-1v1" title="Emoji">😊</button>
-        <input id="msg-input-1v1" type="text" placeholder="Say something…" maxlength="500" autocomplete="off"/>
-        <button type="submit" class="btn-send">
+    </div>
+
+    <div id="view-1v1" class="view hidden">
+      <div id="messages-1v1" class="msg-list" role="log" aria-live="polite"></div>
+      <div id="typing-bar-1v1" class="typing-strip hidden"></div>
+      <div class="pair-controls">
+        <button id="skip-btn" class="retro-btn secondary small">⏭ Next</button>
+        <span id="pair-label" class="pair-label">chatting anonymously</span>
+        <button id="leave-pair-btn" class="retro-btn danger small">✕ End</button>
+      </div>
+      <div class="input-dock">
+        <button class="dock-btn emoji-toggle" data-target="msg-input-1v1">😊</button>
+        <div class="input-wrap">
+          <input id="msg-input-1v1" type="text" placeholder="say something…" maxlength="500" autocomplete="off"/>
+        </div>
+        <button class="dock-btn send-btn" id="send-btn-1v1">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
-      </form>
+      </div>
     </div>
   </main>
 </div>
@@ -199,15 +323,20 @@
   <span>😢</span><span>😎</span><span>🤔</span><span>👀</span><span>💯</span>
   <span>🎉</span><span>😈</span><span>🙏</span><span>💀</span><span>😴</span>
   <span>🤣</span><span>😤</span><span>🥺</span><span>😍</span><span>🤯</span>
-  <span>🫡</span><span>🤝</span><span>💪</span><span>🫠</span><span>🥳</span>
-  <span>🤡</span><span>😏</span><span>🫶</span><span>🧠</span><span>👻</span>
+  <span>🫡</span><span>🥳</span><span>🤡</span><span>😏</span><span>🫶</span>
+  <span>🦊</span><span>🐉</span><span>🌈</span><span>⚡</span><span>🎮</span>
 </div>
 
-<!-- Floating reactions container -->
-<div id="float-reactions"></div>
+<!-- Context menu -->
+<div id="ctx-menu" class="ctx-menu hidden">
+  <button class="ctx-item" id="ctx-reply">↩ Reply</button>
+  <button class="ctx-item" id="ctx-copy">📋 Copy</button>
+</div>
 
-<!-- Toast -->
-<div id="toast-container"></div>
+<!-- Float reactions -->
+<div id="floats"></div>
+<!-- Toasts -->
+<div id="toasts"></div>
 
 <script src="/static/js/app.js"></script>
 </body>
